@@ -30,6 +30,28 @@ const REQUEST: &[u8] = include_bytes!("fixtures/v4-request.bin");
 const RESPONSE: &[u8] = include_bytes!("fixtures/v4-response.bin");
 
 #[test]
+fn header_sign_offer_is_declined_without_rejecting_bind_or_alter_context() {
+    let server = Server::start("");
+    let mut stream = server.connect();
+    for (kind, context, syntax, version, ndr64) in
+        [(11, 0, NDR32, 2, false), (14, 1, NDR64, 1, true)]
+    {
+        let mut negotiation = bind_packet(kind, &[(context, syntax, version)]);
+        negotiation[3] |= 0x04;
+        stream.write_all(&negotiation).unwrap();
+        let ack = read_packet(&mut stream);
+        assert_eq!(ack[2], if kind == 11 { 12 } else { 15 });
+        assert_eq!(ack[3] & 0x04, 0);
+        assert_eq!(bind_results(&ack), [(0, 0)]);
+
+        stream
+            .write_all(&activation(context, ndr64, 2, REQUEST))
+            .unwrap();
+        assert_eq!(response_data(&read_packet(&mut stream), ndr64), RESPONSE);
+    }
+}
+
+#[test]
 fn negotiates_ndr64_and_ndr32_with_alter_context_and_reuses_connection() {
     let server = Server::start("");
     let mut stream = server.connect();

@@ -92,7 +92,7 @@ docker run --rm -p 1688:1688 \
 
 ## 协议范围
 
-- 支持 DCE/RPC Bind, AlterContext, NDR32, NDR64 和 BTFN 协商.
+- 支持 DCE/RPC Bind, AlterContext, NDR32, NDR64 和 BTFN 协商. Bind/AlterContext 可携带 `PFC_SUPPORT_HEADER_SIGN` 能力声明, 响应会清除此位.
 - 支持同一连接上的多次激活请求, TCP 分段和连续报文. 不支持 RPC 分片重组或 RPC 身份验证.
 - 每个连接由独立线程处理, 读写超时为 30 秒. 接入阶段的连接重置不会终止服务; 接入错误会记录日志并退避 100 毫秒重试, 文件描述符资源释放后可恢复接入.
 - 采用无状态模拟计数: 返回 `max(1, 2 * N_Policy)`, 其中 `N_Policy` 是客户端要求的最低数量. 超过 1000 的请求门槛返回无效数据错误.

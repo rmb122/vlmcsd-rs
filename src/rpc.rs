@@ -42,7 +42,9 @@ impl Header {
         }
         let kind = reader.u8()?;
         let flags = reader.u8()?;
-        if flags & 3 != 3 || flags & !0x13 != 0 {
+        // 0x04 advertises header signing in Bind/AlterContext requests.
+        let allowed_flags = if matches!(kind, 11 | 14) { 0x17 } else { 0x13 };
+        if flags & 3 != 3 || flags & !allowed_flags != 0 {
             return Err(invalid("unsupported RPC fragmentation or flags"));
         }
         if reader.u32()? != 0x10 {
@@ -237,6 +239,7 @@ impl Session {
             put_u32(&mut response, version);
         }
         let kind = if header.kind == 11 { 12 } else { 15 };
+        // Clear the header-signing capability in both negotiation responses.
         let flags = if header.kind == 11 {
             3 | (header.flags & 0x10)
         } else {
@@ -311,4 +314,22 @@ fn fault(header: &Header, context: u16, status: u32) -> io::Result<Vec<u8>> {
     put_u32(&mut response, status);
     put_u32(&mut response, 0);
     header.response(3, 0x23, response)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn header_sign_bit_does_not_enable_request_cancellation_or_authentication() {
+        for (kind, auth_length) in [(0, 0_u16), (11, 1), (14, 1)] {
+            let mut header = vec![5, 0, kind, 0x07, 0x10, 0, 0, 0];
+            put_u16(&mut header, 16);
+            put_u16(&mut header, auth_length);
+            put_u32(&mut header, 1);
+            assert!(Header::read(&mut Cursor::new(header)).is_err());
+        }
+    }
 }

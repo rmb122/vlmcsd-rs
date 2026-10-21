@@ -21,16 +21,16 @@ The server runs in the foreground. Startup messages, connection errors, and acti
 
 Configuration is loaded at startup; restart the server after making changes. Omitted fields use built-in defaults, and unknown fields are rejected. Whitelist filtering is disabled in the example configuration. To enable it, add hostname and IP patterns and set `whitelist.enable = true`.
 
-| Field | Default | Description |
-| --- | --- | --- |
-| `listen` | `"0.0.0.0:1688"` | A single listening address and TCP port. IPv6 example: `"[::]:1688"`. |
-| `hwid` | `"3A1C049600B60076"` | The 8-byte hardware ID returned in V6 responses, written as exactly 16 hexadecimal digits. |
-| `activation_interval_minutes` | `120` | Retry interval after an unsuccessful activation, in minutes. |
-| `renewal_interval_minutes` | `10080` | Activation renewal interval, in minutes. |
-| `[epids]` | Upstream ePID defaults | Server product identifiers for each product group. |
-| `whitelist.enable` | `false` | Enables whitelist filtering only when set to `true`. |
-| `whitelist.hostnames` | `[]` | Hostname regular expressions. |
-| `whitelist.ips` | `[]` | TCP source IP regular expressions. |
+| Field                         | Default                | Description                                                                                |
+| ----------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| `listen`                      | `"0.0.0.0:1688"`       | A single listening address and TCP port. IPv6 example: `"[::]:1688"`.                      |
+| `hwid`                        | `"3A1C049600B60076"`   | The 8-byte hardware ID returned in V6 responses, written as exactly 16 hexadecimal digits. |
+| `activation_interval_minutes` | `120`                  | Retry interval after an unsuccessful activation, in minutes.                               |
+| `renewal_interval_minutes`    | `10080`                | Activation renewal interval, in minutes.                                                   |
+| `[epids]`                     | Upstream ePID defaults | Server product identifiers for each product group.                                         |
+| `whitelist.enable`            | `false`                | Enables whitelist filtering only when set to `true`.                                       |
+| `whitelist.hostnames`         | `[]`                   | Hostname regular expressions.                                                              |
+| `whitelist.ips`               | `[]`                   | TCP source IP regular expressions.                                                         |
 
 Both intervals must be positive 32-bit unsigned integers. An ePID must contain 1 to 63 UTF-16 code units and must not contain NUL. ePIDs remain fixed during operation and are not generated randomly.
 
@@ -89,6 +89,30 @@ docker run --rm -p 1688:1688 \
   --mount type=bind,src="$(pwd)/vlmcsd.toml",dst=/etc/vlmcsd-rs/vlmcsd.toml,readonly \
   vlmcsd-rs
 ```
+
+### GitHub Container Registry
+
+The [publishing workflow](.github/workflows/publish.yml) builds and pushes `linux/amd64` images to `ghcr.io/rmb122/vlmcsd-rs`. It runs after pushes to `master`, pushes of tags matching `v*`, and manual runs from the Actions tab. Formatting, Clippy, and tests must pass before publishing.
+
+| Trigger                     | Image tags                                                                 |
+| --------------------------- | -------------------------------------------------------------------------- |
+| Push to `master`            | `latest`, `sha-<full-commit-sha>`                                          |
+| Push a tag such as `v0.1.0` | `v0.1.0`, `sha-<full-commit-sha>`                                          |
+| Manual run                  | `sha-<full-commit-sha>`, plus `latest` on `master` or the selected Git tag |
+
+`latest` follows `master`; version-tag builds do not move it. The workflow uses the repository's `GITHUB_TOKEN` with `packages: write`, so no personal access token or additional secret is required. Actions are pinned to commit SHAs, and image metadata links the package to its source repository.
+
+After the first successful publish, check the package's visibility in GitHub. New GHCR packages are [private by default](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#pushing-container-images); set the package to public if you want anonymous pulls.
+
+Run the published image with:
+
+```sh
+docker run --rm -p 1688:1688 \
+  --mount type=bind,src="$(pwd)/vlmcsd.toml",dst=/etc/vlmcsd-rs/vlmcsd.toml,readonly \
+  ghcr.io/rmb122/vlmcsd-rs:latest
+```
+
+To use it with Compose, replace `build: .` with `image: ghcr.io/rmb122/vlmcsd-rs:latest`, then run `docker compose pull` and `docker compose up -d`.
 
 ## Protocol support
 

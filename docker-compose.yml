@@ -1,5 +1,6 @@
 services:
   kms:
+    image: ghcr.io/rmb122/vlmcsd-rs:latest
     build: .
     ports:
       - "1688:1688/tcp"

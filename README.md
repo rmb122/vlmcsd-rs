@@ -27,14 +27,16 @@ Configuration is loaded at startup; restart the server after making changes. Omi
 | `hwid`                        | `"3A1C049600B60076"`   | The 8-byte hardware ID returned in V6 responses, written as exactly 16 hexadecimal digits. |
 | `activation_interval_minutes` | `120`                  | Retry interval after an unsuccessful activation, in minutes.                               |
 | `renewal_interval_minutes`    | `10080`                | Activation renewal interval, in minutes.                                                   |
-| `[epids]`                     | Upstream ePID defaults | Server product identifiers for each product group.                                         |
+| `[epids]`                     | Built-in ePID defaults | Server product identifiers for each product group.                                         |
 | `whitelist.enable`            | `false`                | Enables whitelist filtering only when set to `true`.                                       |
 | `whitelist.hostnames`         | `[]`                   | Hostname regular expressions.                                                              |
 | `whitelist.ips`               | `[]`                   | TCP source IP regular expressions.                                                         |
 
 Both intervals must be positive 32-bit unsigned integers. An ePID must contain 1 to 63 UTF-16 code units and must not contain NUL. ePIDs remain fixed during operation and are not generated randomly.
 
-The `[epids]` table supports `windows`, `win_china_gov`, `office2010`, `office2013`, `office2016`, and `office2019`. The request's KMS ID selects the product group. As in the reference implementation, unknown KMS IDs use the `windows` group; product names and SKU IDs are not used to reject requests. You can omit the entire table to use the built-in ePIDs.
+The `[epids]` table supports `windows`, `win_china_gov`, `office2010`, `office2013`, `office2016`, `office2019`, `office2021`, and `office2024`. The request's KMS ID selects the product group. Unknown KMS IDs use the `windows` group; product names and SKU IDs are not used to reject requests. You can omit the entire table to use the built-in ePIDs.
+
+Office LTSC 2021 and 2024 use KMS IDs `86d50b16-4808-41af-b83b-b338274318b2` and `a8973cb5-bf03-0a4c-9cef-703099645ab3`, respectively. Their KMS IDs and default ePID product key IDs come from [license-manager's product database](https://github.com/tfslabs/license-manager/blob/014fba5bb3e89b7eeb55e741ed11a5835d241d1e/LmInternalDatabase.xml#L639). The default ePIDs retain that database's date while using this project's Windows Server 2019 host fields (`03612` and `17763.0000`). The other default ePIDs come from vlmcsd's embedded product data. See [vlmcsd.toml](vlmcsd.toml) for all default values.
 
 For example, allow only clients connecting from localhost and reporting the hostname `pc-01.example.local`, while keeping the default response parameters:
 
@@ -89,30 +91,6 @@ docker run --rm -p 1688:1688 \
   --mount type=bind,src="$(pwd)/vlmcsd.toml",dst=/etc/vlmcsd-rs/vlmcsd.toml,readonly \
   vlmcsd-rs
 ```
-
-### GitHub Container Registry
-
-The [publishing workflow](.github/workflows/publish.yml) builds and pushes `linux/amd64` images to `ghcr.io/rmb122/vlmcsd-rs`. It runs after pushes to `master`, pushes of tags matching `v*`, and manual runs from the Actions tab. Formatting, Clippy, and tests must pass before publishing.
-
-| Trigger                     | Image tags                                                                 |
-| --------------------------- | -------------------------------------------------------------------------- |
-| Push to `master`            | `latest`, `sha-<full-commit-sha>`                                          |
-| Push a tag such as `v0.1.0` | `v0.1.0`, `sha-<full-commit-sha>`                                          |
-| Manual run                  | `sha-<full-commit-sha>`, plus `latest` on `master` or the selected Git tag |
-
-`latest` follows `master`; version-tag builds do not move it. The workflow uses the repository's `GITHUB_TOKEN` with `packages: write`, so no personal access token or additional secret is required. Actions are pinned to commit SHAs, and image metadata links the package to its source repository.
-
-After the first successful publish, check the package's visibility in GitHub. New GHCR packages are [private by default](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#pushing-container-images); set the package to public if you want anonymous pulls.
-
-Run the published image with:
-
-```sh
-docker run --rm -p 1688:1688 \
-  --mount type=bind,src="$(pwd)/vlmcsd.toml",dst=/etc/vlmcsd-rs/vlmcsd.toml,readonly \
-  ghcr.io/rmb122/vlmcsd-rs:latest
-```
-
-To use it with Compose, replace `build: .` with `image: ghcr.io/rmb122/vlmcsd-rs:latest`, then run `docker compose pull` and `docker compose up -d`.
 
 ## Protocol support
 

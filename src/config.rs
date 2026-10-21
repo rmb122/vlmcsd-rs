@@ -78,6 +78,7 @@ mod tests {
             renewal_interval_minutes = 1440
             [epids]
             office2016 = "custom-office-server"
+            office2021 = "custom-office-2021"
             "#,
         )
         .unwrap();
@@ -89,6 +90,8 @@ mod tests {
         assert_eq!(config.renewal_interval_minutes, 1440);
         assert_eq!(config.activation_interval_minutes, 120);
         assert_eq!(config.epids.office2016, "custom-office-server");
+        assert_eq!(config.epids.office2021, "custom-office-2021");
+        assert_eq!(config.epids.office2024, Epids::default().office2024);
         assert_eq!(config.epids.windows, Epids::default().windows);
     }
 
@@ -101,10 +104,12 @@ mod tests {
             "activation_interval_minutes = -1".to_owned(),
             "renewal_intervl_minutes = 10".to_owned(),
             "[epids]\nwindows = ''".to_owned(),
+            "[epids]\noffice2021 = ''".to_owned(),
             "[whitelist]\nhostnames = ['[']".to_owned(),
             "[whitelist]\nips = ['[']".to_owned(),
             format!("[epids]\nwindows = '{}'", "x".repeat(64)),
             format!("[epids]\nwindows = '{}'", "😀".repeat(32)),
+            format!("[epids]\noffice2024 = '{}'", "x".repeat(64)),
         ] {
             assert!(Config::parse(&input).is_err(), "{input}");
         }

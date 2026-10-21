@@ -243,20 +243,50 @@ fn malformed_and_truncated_frames_only_close_their_own_connection() {
 #[test]
 fn toml_overrides_are_reflected_in_activation_responses() {
     let server = Server::start(
-        "activation_interval_minutes = 30\nrenewal_interval_minutes = 1440\n[epids]\nwindows = 'test-server'\noffice2016 = 'office-server'\n",
+        r#"
+        activation_interval_minutes = 30
+        renewal_interval_minutes = 1440
+        [epids]
+        windows = 'test-server'
+        office2016 = 'office-server'
+        office2021 = 'office-2021-server'
+        office2024 = 'office-2024-server'
+        "#,
     );
     let mut stream = server.connect();
     stream
         .write_all(&bind_packet(11, &[(0, NDR32, 2)]))
         .unwrap();
     read_packet(&mut stream);
-    let mut office = REQUEST.to_vec();
-    office[48..64].copy_from_slice(&[
-        0x1b, 0xf6, 0xb5, 0x85, 0x0b, 0x32, 0xe3, 0x4b, 0x81, 0x4a, 0xb7, 0x6b, 0x2b, 0xfa, 0xfc,
-        0x82,
-    ]);
-    for (request, epid) in [(REQUEST, "test-server"), (&office[..], "office-server")] {
-        stream.write_all(&activation(0, false, 2, request)).unwrap();
+    for (kms_id, epid) in [
+        (REQUEST[48..64].try_into().unwrap(), "test-server"),
+        (
+            [
+                0x1b, 0xf6, 0xb5, 0x85, 0x0b, 0x32, 0xe3, 0x4b, 0x81, 0x4a, 0xb7, 0x6b, 0x2b, 0xfa,
+                0xfc, 0x82,
+            ],
+            "office-server",
+        ),
+        (
+            [
+                0x16, 0x0b, 0xd5, 0x86, 0x08, 0x48, 0xaf, 0x41, 0xb8, 0x3b, 0xb3, 0x38, 0x27, 0x43,
+                0x18, 0xb2,
+            ],
+            "office-2021-server",
+        ),
+        (
+            [
+                0xb5, 0x3c, 0x97, 0xa8, 0x03, 0xbf, 0x4c, 0x0a, 0x9c, 0xef, 0x70, 0x30, 0x99, 0x64,
+                0x5a, 0xb3,
+            ],
+            "office-2024-server",
+        ),
+    ] {
+        let mut request = REQUEST.to_vec();
+        request[48..64].copy_from_slice(&kms_id);
+        stream
+            .write_all(&activation(0, false, 2, &request))
+            .unwrap();
         let packet = read_packet(&mut stream);
         let data = response_data(&packet, false);
         let pid_size = u32_at(data, 4) as usize;

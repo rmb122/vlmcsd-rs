@@ -9,11 +9,13 @@ pub struct Epids {
     pub office2013: String,
     pub office2016: String,
     pub office2019: String,
+    pub office2021: String,
+    pub office2024: String,
 }
 
 impl Default for Epids {
     fn default() -> Self {
-        // Fixed ePIDs from vlmcsd's embedded product data.
+        // Windows and Office 2010-2019 identities use vlmcsd's embedded data.
         Self {
             windows: "03612-00206-556-123727-03-1033-17763.0000-2972018".into(),
             win_china_gov: "03612-03858-053-089516-03-1033-17763.0000-2972018".into(),
@@ -21,12 +23,16 @@ impl Default for Epids {
             office2013: "03612-00206-240-719639-03-1033-17763.0000-2972018".into(),
             office2016: "03612-00206-438-004532-03-1033-17763.0000-2972018".into(),
             office2019: "03612-00206-684-137669-03-1033-17763.0000-2972018".into(),
+            // Newer Office identities use license-manager's product key IDs
+            // with the same Windows Server 2019 host fields; see README.md.
+            office2021: "03612-00206-578-810880-03-1033-17763.0000-0172025".into(),
+            office2024: "03612-00206-601-010329-03-1033-17763.0000-0172025".into(),
         }
     }
 }
 
 impl Epids {
-    pub fn entries(&self) -> [(&str, &str); 6] {
+    pub fn entries(&self) -> [(&str, &str); 8] {
         [
             ("windows", &self.windows),
             ("win_china_gov", &self.win_china_gov),
@@ -34,6 +40,8 @@ impl Epids {
             ("office2013", &self.office2013),
             ("office2016", &self.office2016),
             ("office2019", &self.office2019),
+            ("office2021", &self.office2021),
+            ("office2024", &self.office2024),
         ]
     }
 
@@ -130,6 +138,42 @@ impl Epids {
                 0x96,
                 0xc6,
             ] => &self.office2019,
+            [
+                0x16,
+                0x0b,
+                0xd5,
+                0x86,
+                0x08,
+                0x48,
+                0xaf,
+                0x41,
+                0xb8,
+                0x3b,
+                0xb3,
+                0x38,
+                0x27,
+                0x43,
+                0x18,
+                0xb2,
+            ] => &self.office2021,
+            [
+                0xb5,
+                0x3c,
+                0x97,
+                0xa8,
+                0x03,
+                0xbf,
+                0x4c,
+                0x0a,
+                0x9c,
+                0xef,
+                0x70,
+                0x30,
+                0x99,
+                0x64,
+                0x5a,
+                0xb3,
+            ] => &self.office2024,
             _ => &self.windows,
         }
     }

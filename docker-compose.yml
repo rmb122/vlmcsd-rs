@@ -1,0 +1,8 @@
+services:
+  kms:
+    build: .
+    ports:
+      - "1688:1688/tcp"
+    volumes:
+      - ./vlmcsd.toml:/etc/vlmcsd-rs/vlmcsd.toml:ro
+    restart: unless-stopped

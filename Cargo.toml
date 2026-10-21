@@ -1,0 +1,24 @@
+[package]
+name = "vlmcsd-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+description = "A Rust KMS activation server emulator"
+
+[dependencies]
+getrandom = "0.4"
+hmac = "0.12"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+toml = { version = "1.1", default-features = false, features = ["parse", "serde", "std"] }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+rustix = { version = "1.1", features = ["net", "process"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,42 +1,42 @@
 # vlmcsd-rs
 
-参考 vlmcsd 实现的 Rust KMS 模拟激活服务器, 支持 KMS V4.0, V5.0 和 V6.0.
+A Rust KMS activation server emulator built with security in mind, supporting KMS protocol versions 4.0, 5.0, and 6.0, based on [vlmcsd](https://github.com/Wind4/vlmcsd).
 
-服务端的 RPC, KMS 报文和协议专用密码算法均使用 Rust 实现. SHA-256 和 HMAC 使用 RustCrypto. 程序不链接或调用 C 版本的 vlmcsd. 第三方依赖内部使用 FFI 不受此限制.
+The RPC implementation, KMS message encoding, and protocol-specific ciphers are written in Rust. SHA-256 and HMAC use RustCrypto. The server does not link to or invoke the C version of vlmcsd; third-party dependencies may use FFI internally.
 
-## 本地运行
+## Build and run
 
-需要 Cargo 和 Rust 1.96.0. 使用 rustup 时, 项目内的工具链配置会选择对应版本.
+Requires Cargo and Rust 1.96.0. When using rustup, the project's toolchain file selects this version.
 
 ```sh
 cargo build --release --locked
 ./target/release/vlmcsd-rs --config ./vlmcsd.toml
 ```
 
-省略 `--config` 时读取当前目录的 `vlmcsd.toml`. 文件不存在, 无法读取或内容无效时, 程序报错并退出. 支持 `--help` 和 `--version`.
+Without `--config`, the server reads `vlmcsd.toml` from the current directory. A missing, unreadable, or invalid configuration file causes startup to fail. `--help` and `--version` are also available.
 
-程序在前台运行. 启动日志, 连接错误和激活过滤结果写入标准输出或标准错误. 激活日志包含解析后的主机名, TCP 来源 IP 和允许/拒绝结果. 使用 Ctrl-C 停止进程.
+The server runs in the foreground. Startup messages, connection errors, and activation decisions go to standard output or standard error. Activation logs include the decoded hostname, TCP source IP, and whether the request was allowed or denied. Press Ctrl-C to stop the server.
 
-## 配置
+## Configuration
 
-配置在启动时读取, 修改后需要重启. 可省略字段以使用内置默认值, 未知字段会报错. 示例文件默认关闭白名单过滤; 需要过滤时, 填写主机名和 IP 规则并设置 `whitelist.enable = true`.
+Configuration is loaded at startup; restart the server after making changes. Omitted fields use built-in defaults, and unknown fields are rejected. Whitelist filtering is disabled in the example configuration. To enable it, add hostname and IP patterns and set `whitelist.enable = true`.
 
-| 字段 | 默认值 | 含义 |
+| Field | Default | Description |
 | --- | --- | --- |
-| `listen` | `"0.0.0.0:1688"` | 单个监听地址和 TCP 端口, IPv6 示例为 `"[::]:1688"` |
-| `hwid` | `"3A1C049600B60076"` | V6 响应中的 8 字节硬件标识, 必须是 16 个十六进制字符 |
-| `activation_interval_minutes` | `120` | 激活失败后的重试间隔, 单位为分钟 |
-| `renewal_interval_minutes` | `10080` | 激活续期间隔, 单位为分钟 |
-| `[epids]` | 上游内置 ePID | 按产品组配置服务器标识 |
-| `whitelist.enable` | `false` | 仅设置为 `true` 时启用白名单过滤 |
-| `whitelist.hostnames` | `[]` | 主机名正则白名单 |
-| `whitelist.ips` | `[]` | TCP 来源 IP 正则白名单 |
+| `listen` | `"0.0.0.0:1688"` | A single listening address and TCP port. IPv6 example: `"[::]:1688"`. |
+| `hwid` | `"3A1C049600B60076"` | The 8-byte hardware ID returned in V6 responses, written as exactly 16 hexadecimal digits. |
+| `activation_interval_minutes` | `120` | Retry interval after an unsuccessful activation, in minutes. |
+| `renewal_interval_minutes` | `10080` | Activation renewal interval, in minutes. |
+| `[epids]` | Upstream ePID defaults | Server product identifiers for each product group. |
+| `whitelist.enable` | `false` | Enables whitelist filtering only when set to `true`. |
+| `whitelist.hostnames` | `[]` | Hostname regular expressions. |
+| `whitelist.ips` | `[]` | TCP source IP regular expressions. |
 
-两个时间间隔均为正的 32 位无符号整数. ePID 必须包含 1 到 63 个 UTF-16 编码单元, 且不能包含 NUL. ePID 在运行期间保持固定, 不自动随机生成.
+Both intervals must be positive 32-bit unsigned integers. An ePID must contain 1 to 63 UTF-16 code units and must not contain NUL. ePIDs remain fixed during operation and are not generated randomly.
 
-`[epids]` 支持 `windows`, `win_china_gov`, `office2010`, `office2013`, `office2016` 和 `office2019`. 根据请求中的 KMS ID 选择产品组. 与参考实现相同, 未知 KMS ID 使用 `windows` 组, 不依据产品名称或 SKU 拒绝请求.
+The `[epids]` table supports `windows`, `win_china_gov`, `office2010`, `office2013`, `office2016`, and `office2019`. The request's KMS ID selects the product group. As in the reference implementation, unknown KMS IDs use the `windows` group; product names and SKU IDs are not used to reject requests. You can omit the entire table to use the built-in ePIDs.
 
-例如, 仅允许从本机连接且上报主机名为 `pc-01.example.local` 的客户端, 其余响应参数使用默认值:
+For example, allow only clients connecting from localhost and reporting the hostname `pc-01.example.local`, while keeping the default response parameters:
 
 ```toml
 listen = "127.0.0.1:1688"
@@ -48,11 +48,11 @@ hostnames = ['(?i)^pc-01\.example\.local$']
 ips = ['^127\.0\.0\.1$']
 ```
 
-## 正则白名单
+## Regex whitelist
 
-只有 `enable = true` 时才执行白名单过滤. 省略 `enable` 或设为 `false` 时跳过过滤, 即使配置了不匹配的规则也不会据此拒绝激活.
+Filtering runs only when `enable = true`. Setting it to `false` or omitting it bypasses whitelist filtering, even if configured patterns do not match.
 
-启用后, 主机名和 IP 两项都必须匹配各自名单中的至少一个正则, 才会生成激活响应. 任意一类名单为空或缺失时拒绝激活. 若只需要限制一项, 显式将另一项配置为 `['.*']`.
+When enabled, **both the hostname and the source IP must match** at least one pattern in their respective lists. An empty or missing list denies activation. To restrict only one field, explicitly set the other list to `['.*']`.
 
 ```toml
 [whitelist]
@@ -61,17 +61,17 @@ hostnames = ['(?i)^pc-[0-9]+\.example\.local$', '^BUILD-SERVER$']
 ips = ['^192\.168\.10\.[0-9]{1,3}$', '^127\.0\.0\.1$', '^::1$']
 ```
 
-- 使用 Rust [regex](https://docs.rs/regex/) 语法. 默认区分大小写, `(?i)` 可启用忽略大小写. 正则默认允许局部匹配, 使用 `^` 和 `$` 限定完整字符串. TOML 单引号字符串保留反斜杠, 适合填写正则.
-- 正则在加载配置时编译和校验, 无论是否启用过滤, 非法表达式都会作为配置错误阻止启动.
-- 主机名从 V4/V5/V6 请求的 `WorkstationName` 字段按 UTF-16LE 解析, 截止到第一个 NUL. 非法 UTF-16 返回无效数据错误.
-- IP 来自实际 TCP 连接, 不包含端口或方括号, 不执行 DNS 查询. IPv6 使用标准压缩表示, IPv4 映射地址如 `::ffff:192.0.2.10` 按 `192.0.2.10` 匹配.
-- 启用过滤时, 每次激活请求都会重新检查, 包括复用同一 TCP 连接的请求. 不匹配时返回 `0x80070005` ([E_ACCESSDENIED](https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values)), 不返回激活数据.
+- Patterns use Rust [regex](https://docs.rs/regex/) syntax. Matching is case-sensitive by default; use `(?i)` to ignore case. Patterns can match substrings unless anchored with `^` and `$`. TOML single-quoted strings preserve backslashes and are convenient for regex patterns.
+- Patterns are compiled and validated when loading the configuration. Invalid patterns prevent startup, even when filtering is disabled.
+- Hostnames are decoded from the V4/V5/V6 `WorkstationName` field as UTF-16LE, ending at the first NUL. Invalid UTF-16 produces an invalid-data error.
+- IPs come from the actual TCP connection, without a port or brackets. No DNS lookup is performed. IPv6 addresses use their standard compressed representation. IPv4-mapped addresses such as `::ffff:192.0.2.10` are matched as `192.0.2.10`.
+- When filtering is enabled, every activation request is checked, including requests that reuse a TCP connection. A rejected request returns `0x80070005` ([E_ACCESSDENIED](https://learn.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values)) without activation data.
 
-主机名由客户端自行上报, 不属于经过验证的身份. IP 是服务端实际看到的连接地址, 经 NAT 或容器端口转发时可能与客户端本地地址不同; 可根据激活日志中的 IP 配置规则.
+The hostname is supplied by the client and is not an authenticated identity. The source IP is the address visible to the server, which may differ from the client's local address when NAT or container port forwarding is involved. Use the IP shown in activation logs when configuring rules.
 
 ## Docker
 
-Dockerfile 使用 Rust 1.96 Alpine 构建静态程序, 最终镜像基于 scratch, 以 UID/GID `65532:65532` 运行.
+The Dockerfile builds a static executable using Rust 1.96 on Alpine. The final image uses scratch and runs as UID/GID `65532:65532`. It includes the license at `/usr/share/licenses/vlmcsd-rs/LICENSE`.
 
 ```sh
 docker compose up -d --build
@@ -79,9 +79,9 @@ docker compose logs -f
 docker compose down
 ```
 
-Compose 发布 TCP 1688, 将宿主机的 `vlmcsd.toml` 只读挂载到 `/etc/vlmcsd-rs/vlmcsd.toml`, 并设置 `restart: unless-stopped`. 修改配置后执行 `docker compose restart`. 容器内的 `listen` 应使用 `0.0.0.0:1688`, 以便通过端口映射访问. 如需更换宿主机端口, 修改 Compose 的 `ports`.
+Compose publishes TCP port 1688, mounts the host's `vlmcsd.toml` read-only at `/etc/vlmcsd-rs/vlmcsd.toml`, and uses `restart: unless-stopped`. Run `docker compose restart` after editing the configuration. Use `0.0.0.0:1688` for `listen` inside the container so that port forwarding can reach the server. To change the host port, edit `ports` in the Compose file.
 
-也可以直接构建并运行镜像:
+You can also build and run the image directly:
 
 ```sh
 docker build -t vlmcsd-rs .
@@ -90,18 +90,18 @@ docker run --rm -p 1688:1688 \
   vlmcsd-rs
 ```
 
-## 协议范围
+## Protocol support
 
-- 支持 DCE/RPC Bind, AlterContext, NDR32, NDR64 和 BTFN 协商. Bind/AlterContext 可携带 `PFC_SUPPORT_HEADER_SIGN` 能力声明, 响应会清除此位.
-- 支持同一连接上的多次激活请求, TCP 分段和连续报文. 不支持 RPC 分片重组或 RPC 身份验证.
-- 每个连接由独立线程处理, 读写超时为 30 秒. 接入阶段的连接重置不会终止服务; 接入错误会记录日志并退避 100 毫秒重试, 文件描述符资源释放后可恢复接入.
-- 采用无状态模拟计数: 返回 `max(1, 2 * N_Policy)`, 其中 `N_Policy` 是客户端要求的最低数量. 超过 1000 的请求门槛返回无效数据错误.
-- 回显客户端标识和客户端时间. 不维护客户端列表, 不检查客户端与服务器的时间差, 不需要数据库或持久化目录.
-- 不包含激活客户端, 系统服务安装器或自动发现功能.
+- DCE/RPC Bind, AlterContext, NDR32, NDR64, and BTFN negotiation are supported. Bind and AlterContext requests may advertise `PFC_SUPPORT_HEADER_SIGN`; responses clear that capability bit.
+- Multiple activation requests can share a connection. TCP segmentation and consecutive messages are handled. RPC fragment reassembly and RPC authentication are not supported.
+- Each connection is handled by a separate thread with 30-second read and write timeouts. Connection resets during acceptance do not terminate the server. Accept errors are logged and retried after a 100 ms delay, allowing acceptance to recover when file descriptors become available.
+- Client counting is stateless: responses return `max(1, 2 * N_Policy)`, where `N_Policy` is the client's required minimum count. A requested minimum above 1000 produces an invalid-data error.
+- Responses echo the client ID and timestamp. The server does not maintain a client list or check client clock skew, and requires no database or persistent data directory.
+- No activation client, service installer, or automatic discovery functionality is included.
 
-协议覆盖不等同于每个 Windows/Office 版本都经过实机验证. 自动验收使用上游 vlmcs 的协议检查功能.
+Protocol support does not imply testing against every Windows or Office release. Interoperability checks use the upstream vlmcs client's protocol validation.
 
-## 检查与测试
+## Checks and tests
 
 ```sh
 cargo fmt --check
@@ -111,9 +111,11 @@ cargo build --release --locked
 docker compose config --quiet
 ```
 
-密码和 KMS 单元测试使用上游生成的固定报文验证 V4/V5/V6 响应, 无需 C 编译器或上游源码. 来源和生成参数见 [测试向量说明](tests/fixtures/README.md). 网络集成测试启动本项目二进制并使用临时端口, 覆盖 RPC 协商, NDR64 非零对齐填充, AlterContext 保留分片上限, 连接复用, 错误隔离, 配置覆盖和三个版本的白名单过滤. Linux 上还会验证排队连接的 TCP 重置, 以及仅降低测试服务子进程文件描述符上限后的服务存活和恢复.
+Crypto and KMS unit tests compare V4/V5/V6 responses with fixed packets generated by the upstream implementation. They require neither a C compiler nor the upstream source tree. See the [fixture documentation](tests/fixtures/README.md) for provenance and generation parameters.
 
-如已安装上游 vlmcs, 先允许主机名 `pc-01.example.local` 和实际来源 IP, 再进行独立互通检查:
+Network integration tests start the server on temporary ports. They cover RPC negotiation, nonzero NDR64 alignment padding, preservation of fragment limits across AlterContext, connection reuse, error isolation, configuration overrides, and whitelist filtering across all three KMS versions. Linux tests also exercise queued TCP resets and descriptor exhaustion, reducing only the test server child process's descriptor limit and checking continued service and recovery.
+
+If the upstream vlmcs client is installed, allow `pc-01.example.local` and the actual source IP in the whitelist, then run these independent interoperability checks:
 
 ```sh
 for version in 4 5 6; do
@@ -123,4 +125,8 @@ for version in 4 5 6; do
 done
 ```
 
-检查输出中是否存在 `ERROR`, `WARNING` 或 `Fatal`, 而非仅检查客户端退出码. 上游客户端仅作为独立测试工具, 不属于项目依赖.
+Check the output for `ERROR`, `WARNING`, or `Fatal` messages rather than relying only on the client's exit code. The upstream client is an external verification tool, not a project dependency.
+
+## License
+
+This project is licensed under the GNU Affero General Public License version 3 only (`AGPL-3.0-only`). See [LICENSE](LICENSE) for the full terms. Third-party dependencies retain their respective licenses.
